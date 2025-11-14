@@ -16,16 +16,16 @@
 
 package com.caoccao.javet.swc4j;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.text.MessageFormat;
+
 import com.caoccao.javet.swc4j.exceptions.Swc4jLibException;
 import com.caoccao.javet.swc4j.interfaces.ISwc4jLogger;
 import com.caoccao.javet.swc4j.utils.ArrayUtils;
 import com.caoccao.javet.swc4j.utils.OSUtils;
 import com.caoccao.javet.swc4j.utils.Swc4jDefaultLogger;
-
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.text.MessageFormat;
 
 /**
  * The type Swc4j lib loader.
@@ -49,7 +49,7 @@ final class Swc4jLibLoader {
     private static final String LIB_FILE_EXTENSION_WINDOWS = "dll";
     private static final String LIB_FILE_NAME_FORMAT = "libswc4j-{0}-{1}.v.{2}.{3}";
     private static final String LIB_NAME = "swc4j";
-    private static final String LIB_VERSION = "2.0.0";
+    private static final String LIB_VERSION = "1.8.0";
     private static final ISwc4jLogger LOGGER = new Swc4jDefaultLogger(Swc4jLibLoader.class.getName());
     private static final long MIN_LAST_MODIFIED_GAP_IN_MILLIS = 60L * 1000L; // 1 minute
     private static final String OS_ANDROID = "android";
@@ -197,15 +197,21 @@ final class Swc4jLibLoader {
      * @since 0.1.0
      */
     void load() {
+        String libFilePath = null;
         try {
             File libPath = new File(OSUtils.TEMP_DIRECTORY, LIB_NAME);
-            purge(libPath);
+            
             File rootLibPath;
             if (OSUtils.IS_ANDROID) {
                 rootLibPath = libPath;
             } else {
                 rootLibPath = new File(libPath, Long.toString(OSUtils.PROCESS_ID));
             }
+            
+            purge(libPath, rootLibPath);
+            
+            rootLibPath = new File (rootLibPath, Double.toString(Math.random()));
+            
             if (!rootLibPath.exists()) {
                 if (!rootLibPath.mkdirs()) {
                     throw Swc4jLibException.libNotCreated(rootLibPath.getAbsolutePath());
@@ -213,7 +219,7 @@ final class Swc4jLibLoader {
             }
             String resourceFileName = getResourceFileName();
             File libFile = new File(rootLibPath, getLibFileName()).getAbsoluteFile();
-            String libFilePath = libFile.getAbsolutePath();
+            libFilePath = libFile.getAbsolutePath();
             deployLibFile(resourceFileName, libFile);
             System.load(libFilePath);
         } catch (Throwable t) {
@@ -221,14 +227,15 @@ final class Swc4jLibLoader {
         }
     }
 
-    private void purge(File rootLibPath) {
+    private void purge(File rootLibPath, File currentProcesPath) {
         try {
             if (rootLibPath.exists()) {
                 if (rootLibPath.isDirectory()) {
                     File[] files = rootLibPath.listFiles();
                     if (ArrayUtils.isNotEmpty(files)) {
                         for (File libFileOrPath : files) {
-                            if (libFileOrPath.lastModified() + MIN_LAST_MODIFIED_GAP_IN_MILLIS > System.currentTimeMillis()) {
+                            if (libFileOrPath.lastModified() + MIN_LAST_MODIFIED_GAP_IN_MILLIS > System.currentTimeMillis()
+                                || libFileOrPath.equals(currentProcesPath)) {
                                 continue;
                             }
                             boolean toBeDeleted = false;
